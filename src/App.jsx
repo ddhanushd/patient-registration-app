@@ -8,50 +8,95 @@ import { PGlite } from '@electric-sql/pglite'
 import PGWorker from './worker.js?worker' // Import worker
 
 function App() {
-  const [patients, setPatients] = useState([])
+  const [rows, setRows] = useState([]);
+  const [name, setName] = useState('');
+  const [disease, setDisease] = useState('');
 
   useEffect(() => {
-    const fetchPatients = async () => {
+    const fetchData = async () => {
       try {
-        const db = await getDB()
-
-        // Optional: insert sample patients only if table is empty
-        const result = await db.exec('SELECT * FROM patients')
-        if (result[0].rows.length === 0) {
-          await db.exec(`
-            INSERT INTO patients (name, dob, gender, contact, address, disease)
-            VALUES 
-              ('Alice', '1990-01-01', 'Female', '1234567890', 'Bangalore', 'Flu'),
-              ('Bob', '1985-05-10', 'Male', '9876543210', 'Hyderabad', 'Cold')
-          `)
+        const db = await getDB(); // Get the database instance
+        const result = await db.exec("SELECT * FROM patients");
+        if (result && result[0] && result[0].rows) {
+          setRows(result[0].rows); // Update rows state with patient data
+        } else {
+          console.error("No rows found in result:", result);
         }
-
-        const resultAfterInsert = await db.exec('SELECT * FROM patients')
-        setPatients(resultAfterInsert[0].rows)
       } catch (error) {
-        console.error('Error loading patient data:', error)
+        console.error("Error fetching data:", error);
       }
-    }
+    };
 
-    fetchPatients()
-  }, [])
+    fetchData();
+  }, []);
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+
+    try {
+      const db = await getDB(); // Get the database instance
+
+      // Insert patient data into the database
+      await db.exec(`INSERT INTO patients (name, disease) VALUES ('${name}', '${disease}')`);
+      console.log("Patient data inserted");
+
+      // Refresh the patient data
+      const result = await db.exec("SELECT * FROM patients");
+      if (result && result[0] && result[0].rows) {
+        setRows(result[0].rows); // Update rows state with new patient data
+      }
+
+      // Clear the form
+      setName('');
+      setDisease('');
+
+    } catch (error) {
+      console.error("Error inserting patient data:", error);
+    }
+  };
 
   return (
     <div>
-      <h1>Patient Records</h1>
+      <h1>Patient Registration</h1>
+
+      {/* Patient Form */}
+      <form onSubmit={handleSubmit}>
+        <label>
+          Name:
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+          />
+        </label>
+        <label>
+          Disease:
+          <input
+            type="text"
+            value={disease}
+            onChange={(e) => setDisease(e.target.value)}
+            required
+          />
+        </label>
+        <button type="submit">Add Patient</button>
+      </form>
+
+      {/* Patient Data */}
+      <h2>Patient Data:</h2>
       <ul>
-        {patients.length > 0 ? (
-          patients.map((p) => (
-            <li key={p.id}>
-              {p.name} - {p.disease}
+        {Array.isArray(rows) && rows.length > 0 ? (
+          rows.map((row, index) => (
+            <li key={index}>
+              {row.name} - {row.disease}
             </li>
           ))
         ) : (
-          <p>No patient records found.</p>
+          <p>No data available</p>
         )}
       </ul>
     </div>
-  )
+  );
 }
 
 export default App
