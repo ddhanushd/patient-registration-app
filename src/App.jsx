@@ -1,16 +1,10 @@
-import { useState, useEffect } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
-import { getDB } from './db'
-
-import { PGlite } from '@electric-sql/pglite'
-import PGWorker from './worker.js?worker' // Import worker
+import { useState, useEffect } from 'react';
+import './App.css';
+import { getDB } from './db';
 
 function App() {
   const [patients, setPatients] = useState([]);
-  const [editId, setEditId] = useState(null);
-
+  const [searchQuery, setSearchQuery] = useState('');
   const [patientData, setPatientData] = useState({
     name: '',
     dob: '',
@@ -19,12 +13,19 @@ function App() {
     address: '',
     disease: '',
   });
+  const [editId, setEditId] = useState(null);
 
-  // Load patients data from the database
-  const loadPatients = async () => {
+  // Load patients data from the database with search functionality
+  const loadPatients = async (search = '') => {
     try {
       const db = await getDB();
-      const result = await db.exec('SELECT * FROM patients');
+      let query = 'SELECT * FROM patients';
+      
+      if (search) {
+        query += ` WHERE name LIKE '%${search}%' OR disease LIKE '%${search}%'`;
+      }
+
+      const result = await db.exec(query);
       setPatients(result[0].rows); // Set the rows of patients
     } catch (error) {
       console.error('Error fetching patients data:', error);
@@ -46,49 +47,45 @@ function App() {
     const db = await getDB();
   
     if (editId) {
-      // UPDATE query with escaped values to prevent syntax errors
-      const escape = (str) => str.replace(/'/g, "''"); // Escape single quotes
-      
+      // UPDATE query
       await db.exec(`
         UPDATE patients SET
-          name = '${escape(patientData.name)}',
-          dob = '${escape(patientData.dob)}',
-          gender = '${escape(patientData.gender)}',
-          contact = '${escape(patientData.contact)}',
-          address = '${escape(patientData.address)}',
-          disease = '${escape(patientData.disease)}'
+          name = '${patientData.name}',
+          dob = '${patientData.dob}',
+          gender = '${patientData.gender}',
+          contact = '${patientData.contact}',
+          address = '${patientData.address}',
+          disease = '${patientData.disease}'
         WHERE id = ${editId}
       `);
-      setEditId(null); // Reset edit ID
+      setEditId(null);
     } else {
-      // INSERT query with escaped values
-      const escape = (str) => str.replace(/'/g, "''");
-      
+      // INSERT query
       await db.exec(`
         INSERT INTO patients (name, dob, gender, contact, address, disease)
         VALUES (
-          '${escape(patientData.name)}',
-          '${escape(patientData.dob)}',
-          '${escape(patientData.gender)}',
-          '${escape(patientData.contact)}',
-          '${escape(patientData.address)}',
-          '${escape(patientData.disease)}'
+          '${patientData.name}',
+          '${patientData.dob}',
+          '${patientData.gender}',
+          '${patientData.contact}',
+          '${patientData.address}',
+          '${patientData.disease}'
         )
       `);
     }
-  
+
     setPatientData({ name: '', dob: '', gender: '', contact: '', address: '', disease: '' });
-    loadPatients();
+    loadPatients(searchQuery);
   };
 
   // Handle Delete Function
   const handleDelete = async (id) => {
     const db = await getDB();
     await db.exec(`DELETE FROM patients WHERE id = ${id}`);
-    loadPatients(); // refresh list
+    loadPatients(searchQuery); // Refresh list
   };
-  
-  // Handle Edit: Step-by-step
+
+  // Handle Edit Function
   const handleEdit = (patient) => {
     setPatientData({
       name: patient.name,
@@ -98,22 +95,30 @@ function App() {
       address: patient.address,
       disease: patient.disease,
     });
-    setEditId(patient.id); // Store the patient's ID to update
-  };
-  
-  // Clear edit mode and reset form
-  const handleCancelEdit = () => {
-    setEditId(null);
-    setPatientData({ name: '', dob: '', gender: '', contact: '', address: '', disease: '' });
+    setEditId(patient.id);
   };
 
+  // Handle Search Input Change
+  const handleSearchChange = (e) => {
+    setSearchQuery(e.target.value);
+  };
+
+  // Load patients initially and when searchQuery changes
   useEffect(() => {
-    loadPatients();
-  }, []);
+    loadPatients(searchQuery);
+  }, [searchQuery]);
 
   return (
     <div>
       <h1>Patient Registration</h1>
+
+      {/* Search Bar */}
+      <input
+        type="text"
+        value={searchQuery}
+        onChange={handleSearchChange}
+        placeholder="Search by name or disease"
+      />
 
       {/* Patient Form */}
       <form onSubmit={handleSubmit}>
@@ -160,36 +165,24 @@ function App() {
           onChange={handleInputChange}
           placeholder="Disease"
         />
-        <button type="submit">
-          {editId ? 'Update Patient' : 'Add Patient'}
-        </button>
+        <button type="submit">Add Patient</button>
       </form>
-
-      {/* Cancel Edit Button */}
-      {editId && (
-        <button type="button" onClick={handleCancelEdit}>
-          Cancel Edit
-        </button>
-      )}
 
       <h2>Patient List</h2>
       <table border="1" cellPadding="8" style={{ marginTop: '1rem' }}>
         <thead>
           <tr>
-            <th>ID</th>
             <th>Name</th>
             <th>DOB</th>
             <th>Gender</th>
             <th>Contact</th>
             <th>Address</th>
             <th>Disease</th>
-            <th>Actions</th>
           </tr>
         </thead>
         <tbody>
           {patients.map((patient) => (
             <tr key={patient.id}>
-              <td>{patient.id}</td>
               <td>{patient.name}</td>
               <td>{patient.dob}</td>
               <td>{patient.gender}</td>
@@ -204,19 +197,6 @@ function App() {
           ))}
         </tbody>
       </table>
-
-      {/* Patient List */}
-      <ul>
-        {patients.length > 0 ? (
-          patients.map((patient) => (
-            <li key={patient.id}>
-              <strong>{patient.name}</strong> - {patient.disease} - {patient.contact}
-            </li>
-          ))
-        ) : (
-          <p>No patients registered.</p>
-        )}
-      </ul>
     </div>
   );
 }
