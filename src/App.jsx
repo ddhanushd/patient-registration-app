@@ -14,7 +14,7 @@ function App() {
     disease: '',
   });
   const [editId, setEditId] = useState(null);
-
+  
   // Load patients data from the database with search functionality
   const loadPatients = async (search = '') => {
     try {
