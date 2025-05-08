@@ -1,3 +1,4 @@
+
 // src/db.js
 import { PGlite, IdbFs } from '@electric-sql/pglite';
 import PGWorker from './worker.js?worker';
