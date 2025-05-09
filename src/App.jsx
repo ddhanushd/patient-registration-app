@@ -9,7 +9,7 @@ function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [patientData, setPatientData] = useState({
     name: '',
-    dob: null, // Keep as null for no initial date selected
+    dob: null,
     gender: '',
     contact: '',
     address: '',
@@ -22,59 +22,61 @@ function App() {
 
   const showNotification = (message, type = 'success') => {
     setNotification({ message, type });
-    setTimeout(() => {
-      setNotification(null);
-    }, 3000); // Adjust timeout as needed
+    setTimeout(() => setNotification(null), 3000);
   };
 
   const loadPatients = async (search = '', sortBy = null, sortDir = 'asc') => {
     try {
       const db = await getDB();
       let query = 'SELECT * FROM patients';
-
       if (search) {
         query += ` WHERE name LIKE '%${search}%' OR disease LIKE '%${search}%'`;
       }
-
       if (sortBy) {
-        query += ` ORDER BY ${sortBy} ${sortDir}`;
+        query += ` ORDER BY ${sortBy} COLLATE NOCASE ${sortDir}`;
       } else {
-        query += ' ORDER BY id DESC'; // Default sorting
+        query += ' ORDER BY id DESC';
       }
-
       const result = await db.exec(query);
-      setPatients(result[0].rows);
+      setPatients(result[0]?.rows || []);
     } catch (error) {
-      console.error('Error fetching patients data:', error);
+      console.error('Error fetching patients:', error);
       showNotification('Error loading patients', 'error');
     }
   };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setPatientData((prevState) => ({
-      ...prevState,
-      [name]: value,
-    }));
+    setPatientData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleDateChange = (date) => {
-    setPatientData((prevState) => ({
-      ...prevState,
-      dob: date,
-    }));
+    setPatientData((prev) => ({ ...prev, dob: date }));
+  };
+
+  const validateForm = () => {
+    const { name, dob, gender, contact, address, disease } = patientData;
+    if (!name.trim()) return 'Name is required';
+    if (name.length < 2) return 'Name should be at least 2 characters long';
+    if (!dob) return 'Date of Birth is required';
+    if (!gender) return 'Gender is required';
+    if (!/^\d{10}$/.test(contact)) return 'Contact must be 10 digits';
+    if (!address.trim()) return 'Address is required';
+    if (!disease.trim()) return 'Disease is required';
+    return null;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const db = await getDB();
-    const { name, dob, gender, contact, address, disease } = patientData;
-    const formattedDob = dob ? dob.toISOString().split('T')[0] : ''; // Format date for database
-
-    if (!name) {
-      showNotification('Name is required', 'error');
+    const error = validateForm();
+    if (error) {
+      showNotification(error, 'error');
       return;
     }
+
+    const db = await getDB();
+    const { name, dob, gender, contact, address, disease } = patientData;
+    const formattedDob = dob.toISOString().split('T')[0];
 
     try {
       if (editId) {
@@ -94,36 +96,29 @@ function App() {
         await db.exec(`
           INSERT INTO patients (name, dob, gender, contact, address, disease)
           VALUES (
-            '${name}',
-            '${formattedDob}',
-            '${gender}',
-            '${contact}',
-            '${address}',
-            '${disease}'
+            '${name}', '${formattedDob}', '${gender}', '${contact}', '${address}', '${disease}'
           )
         `);
         showNotification('Patient added successfully');
       }
-
       setPatientData({ name: '', dob: null, gender: '', contact: '', address: '', disease: '' });
       loadPatients(searchQuery, sortColumn, sortDirection);
     } catch (error) {
-      console.error('Error submitting patient data:', error);
-      showNotification('Error saving patient data', 'error');
+      console.error('Error saving patient:', error);
+      showNotification('Error saving patient', 'error');
     }
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this patient?')) {
+    if (!window.confirm('Are you sure you want to delete this patient?')) return;
+    try {
       const db = await getDB();
-      try {
-        await db.exec(`DELETE FROM patients WHERE id = ${id}`);
-        showNotification('Patient deleted successfully');
-        loadPatients(searchQuery, sortColumn, sortDirection);
-      } catch (error) {
-        console.error('Error deleting patient:', error);
-        showNotification('Error deleting patient', 'error');
-      }
+      await db.exec(`DELETE FROM patients WHERE id = ${id}`);
+      showNotification('Patient deleted successfully');
+      loadPatients(searchQuery, sortColumn, sortDirection);
+    } catch (error) {
+      console.error('Error deleting patient:', error);
+      showNotification('Error deleting patient', 'error');
     }
   };
 
@@ -145,11 +140,17 @@ function App() {
 
   const handleSort = (column) => {
     if (sortColumn === column) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+      setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
     } else {
       setSortColumn(column);
       setSortDirection('asc');
     }
+  };
+
+  const formatDate = (dateStr) => {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    return d.toISOString().split('T')[0];
   };
 
   useEffect(() => {
@@ -168,10 +169,9 @@ function App() {
         <div className="form-section">
           <h2>{editId ? 'Edit Patient' : 'Patient Registration'}</h2>
           <form onSubmit={handleSubmit}>
-            <label htmlFor="name">Name:</label>
+            <label>Name:</label>
             <input
               type="text"
-              id="name"
               name="name"
               value={patientData.name}
               onChange={handleInputChange}
@@ -179,23 +179,19 @@ function App() {
               required
               className="form-input"
             />
-
-            <label htmlFor="dob">Date of Birth:</label>
+            <label>Date of Birth:</label>
             <DatePicker
-              id="dob"
               selected={patientData.dob}
               onChange={handleDateChange}
               dateFormat="yyyy-MM-dd"
-              placeholderText="YYYY-MM-DD" // Display format as placeholder
-              showMonthDropdown // Enable month dropdown
-              showYearDropdown // Enable year dropdown
-              dropdownMode="select" // Use select boxes for month/year
+              placeholderText="YYYY-MM-DD"
+              showMonthDropdown
+              showYearDropdown
+              dropdownMode="select"
               className="form-input"
             />
-
-            <label htmlFor="gender">Gender:</label>
+            <label>Gender:</label>
             <select
-              id="gender"
               name="gender"
               value={patientData.gender}
               onChange={handleInputChange}
@@ -206,33 +202,27 @@ function App() {
               <option value="Female">Female</option>
               <option value="Other">Other</option>
             </select>
-
-            <label htmlFor="contact">Contact:</label>
+            <label>Contact:</label>
             <input
               type="text"
-              id="contact"
               name="contact"
               value={patientData.contact}
               onChange={handleInputChange}
-              placeholder="Contact"
+              placeholder="10-digit contact"
               className="form-input"
             />
-
-            <label htmlFor="address">Address:</label>
+            <label>Address:</label>
             <input
               type="text"
-              id="address"
               name="address"
               value={patientData.address}
               onChange={handleInputChange}
               placeholder="Address"
               className="form-input"
             />
-
-            <label htmlFor="disease">Disease:</label>
+            <label>Disease:</label>
             <input
               type="text"
-              id="disease"
               name="disease"
               value={patientData.disease}
               onChange={handleInputChange}
@@ -248,10 +238,10 @@ function App() {
           <div className="search-bar">
             <input
               type="text"
-              className="search-input"
               value={searchQuery}
               onChange={handleSearchChange}
               placeholder="Search by name or disease"
+              className="search-input"
             />
           </div>
           <div className="table-responsive">
@@ -268,20 +258,26 @@ function App() {
                 </tr>
               </thead>
               <tbody>
-                {patients.map((patient) => (
-                  <tr key={patient.id}>
-                    <td>{patient.name}</td>
-                    <td>{patient.dob}</td>
-                    <td>{patient.gender}</td>
-                    <td>{patient.contact}</td>
-                    <td>{patient.address}</td>
-                    <td>{patient.disease}</td>
-                    <td className="actions">
-                      <button className="edit-btn" onClick={() => handleEdit(patient)}>Edit</button>
-                      <button className="delete-btn" onClick={() => handleDelete(patient.id)}>Delete</button>
-                    </td>
+                {patients.length === 0 ? (
+                  <tr>
+                    <td colSpan="7">No patients found</td>
                   </tr>
-                ))}
+                ) : (
+                  patients.map((patient) => (
+                    <tr key={patient.id}>
+                      <td>{patient.name}</td>
+                      <td>{formatDate(patient.dob)}</td>
+                      <td>{patient.gender}</td>
+                      <td>{patient.contact}</td>
+                      <td>{patient.address}</td>
+                      <td>{patient.disease}</td>
+                      <td className="actions">
+                        <button onClick={() => handleEdit(patient)}>Edit</button>
+                        <button onClick={() => handleDelete(patient.id)}>Delete</button>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
