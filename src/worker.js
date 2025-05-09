@@ -1,5 +1,3 @@
-
-// worker.js
 self.onmessage = async (e) => {
   const response = await fetch('your-webassembly-module.wasm');
   const wasmBuffer = await response.arrayBuffer();
@@ -9,5 +7,5 @@ self.onmessage = async (e) => {
   self.postMessage({ status: 'WASM compiled successfully', wasmModule });
 };
 
-// You may need to handle incoming messages or events in your worker
+
 

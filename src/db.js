@@ -1,9 +1,5 @@
-
-
-// src/db.js
 import { PGlite, IdbFs } from '@electric-sql/pglite';
 import PGWorker from './worker.js?worker';
-import { live } from '@electric-sql/pglite/live'; // Import live
 
 let db;
 
