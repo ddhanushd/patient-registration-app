@@ -35,7 +35,7 @@ The app supports patient registration, SQL-based querying, and works seamlessly 
 - **React**
 - **Vite** (for fast dev builds)
 - **Pglite** for SQLite in the browser
-- **Tailwind CSS** or plain CSS (depending on your setup)
+- **CSS** 
 - **Vercel** for deployment
 
 ---
