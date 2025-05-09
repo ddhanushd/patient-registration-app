@@ -77,11 +77,13 @@ Visit https://patient-registration-app-pearl.vercel.app/
 Vercel auto-detects React + Vite settings.
 
 ⚠️ Limitations
+
 Data is browser-specific. Switching devices/browsers won't retain the data.
 
 Some advanced SQL operations might not be fully supported via Pglite.
 
 🧩 Challenges Faced
+
 Integrating Pglite in a React lifecycle while ensuring smooth local DB operations.
 
 Maintaining data persistence across tab reloads and syncing changes across tabs.
