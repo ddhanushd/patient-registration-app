@@ -93,5 +93,7 @@ Building a minimal search UI that allows users to search patients by name or dis
 Ensuring good UX without backend logic or database.
 
 🧑‍💻 Author
+
 D Dhanush
+
 GitHub
